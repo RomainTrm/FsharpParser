@@ -8,17 +8,6 @@ type Result<'a> =
 
 type Parser<'T> = Parser of (string -> Result<'T * string>)
 
-let pchar charToMatch = 
-    let innerFun str = 
-        if String.IsNullOrEmpty(str) 
-        then Failure "No more input"
-        else
-            let first = str.[0]
-            if first = charToMatch 
-            then Success (first, str.[1..])
-            else Failure (sprintf "Expecting '%c'. Got '%c'" charToMatch first)
-    Parser innerFun 
-
 let run parser input = 
     let (Parser innerFn) = parser 
     innerFn input
@@ -33,7 +22,8 @@ let andThen parser1 parser2 =
             | Success (value2, remaining2) -> 
                 Success ((value1, value2), remaining2)
     Parser innerFun
-let (.>>.) = andThen        
+let (.>>.) = andThen    
+
 
 let orElse parser1 parser2 =
     let innerFun input =
@@ -45,12 +35,7 @@ let orElse parser1 parser2 =
 let (<|>) = orElse    
 
 let choice listOfParsers = 
-    List.reduce ( <|> ) listOfParsers 
-
-let anyOf listOfChars = 
-    listOfChars
-    |> List.map pchar
-    |> choice
+    List.reduce (<|>) listOfParsers 
 
 let mapP f parser =
     let innerFn input =
@@ -60,17 +45,68 @@ let mapP f parser =
             Success (newValue, remaining)
         | Failure err -> Failure err
     Parser innerFn
-let ( |>> ) x f = mapP f x
+let (|>>) x f = mapP f x
 
+let rec parseZeroOrMore parser input =
+    let firstResult = run parser input
+    match firstResult with
+    | Failure err -> ([],input)
+    | Success (firstValue,inputAfterFirstParse) ->
+        let (subsequentValues,remainingInput) = parseZeroOrMore parser inputAfterFirstParse
+        let values = firstValue::subsequentValues
+        (values,remainingInput)
 
+let many parser =
+    let rec innerFn input = Success (parseZeroOrMore parser input)
+    Parser innerFn
+    
+type Number = One | Five | Ten | Fifty
 
-let parseI = pchar 'I'
-let test = parseI <|> parseI .>>. parseI <|> (parseI .>>. parseI) .>>. parseI
+let pnumber charToMatch number = 
+    let innerFun str = 
+        if String.IsNullOrEmpty(str) 
+        then Failure "No more input"
+        else
+            let first = str.[0]
+            if first = charToMatch 
+            then Success (number, str.[1..])
+            else Failure (sprintf "Expecting '%c'. Got '%c'" charToMatch first)
+    Parser innerFun 
+    
+let zeroOrOneParser parser =
+    let rec innerFun input = 
+        match run parser input with
+        | Failure _ -> Success ([], input)
+        | Success (firstValue, inputAfterFirstParse) -> Success ([firstValue], inputAfterFirstParse) 
+    Parser innerFun
 
-let parseDigit = anyOf ['0'..'9']
+let zeroToThreeParser parser =
+    let rec innerFun count input = 
+        match run parser input with
+        | Failure _ -> ([], input)
+        | Success (firstValue, inputAfterFirstParse) when count = 3 ->
+            ([firstValue], inputAfterFirstParse) 
+        | Success (firstValue, inputAfterFirstParse) ->
+            let (subsequentValues, remainingInput) = innerFun (count + 1) inputAfterFirstParse
+            let values = firstValue::subsequentValues
+            (values, remainingInput) 
+    Parser (fun input -> Success (innerFun 1 input))
 
-let parseThreeDigitsAsStr =
-    (parseDigit .>>. parseDigit .>>. parseDigit)
-    |>> fun ((c1, c2), c3) -> String [| c1; c2; c3 |]
+let parseOne = pnumber 'I' One
+let parseFive = pnumber 'V' Five
+let parseTen = pnumber 'X' Ten
+let parseFifty = pnumber 'L' Fifty
 
-let parse value = sprintf "Parsed %s" value
+let (<@>) left right = andThen left right |>> (fun (x, y) -> x@y)
+
+let parse value = 
+    let parser = zeroOrOneParser parseFifty <@> zeroToThreeParser parseTen <@> zeroOrOneParser parseFive <@> zeroToThreeParser parseOne
+    match run parser value with
+    | Failure msg -> Failure msg
+    | Success (numbers, "") ->
+        Success (numbers |> List.sumBy (fun nb -> match nb with
+                                                  | One -> 1
+                                                  | Five -> 5
+                                                  | Ten -> 10
+                                                  | Fifty -> 50))
+    | Success (_, _) -> Failure "Not a valid input"
