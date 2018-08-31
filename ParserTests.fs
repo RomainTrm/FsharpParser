@@ -7,6 +7,7 @@ open FsUnit
 type TestCase = { Input: string; Result: Result<int> }
 
 let testCases = [|
+        { Input = "Invalid input"; Result = Failure "Not a valid input" }
         { Input = "IIII"; Result = Failure "Not a valid input" }
         { Input = "VV"; Result = Failure "Not a valid input"  }
 

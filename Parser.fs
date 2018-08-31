@@ -5,8 +5,21 @@ open System
 type Result<'a> = 
     | Success of 'a
     | Failure of string
-
+    
 type Parser<'T> = Parser of (string -> Result<'T * string>)
+
+type Number = One | Five | Ten | Fifty
+
+let pnumber charToMatch number = 
+    let innerFun str = 
+        if String.IsNullOrEmpty(str) 
+        then Failure "No more input"
+        else
+            let first = str.[0]
+            if first = charToMatch 
+            then Success (number, str.[1..])
+            else Failure (sprintf "Expecting '%c'. Got '%c'" charToMatch first)
+    Parser innerFun 
 
 let run parser input = 
     let (Parser innerFn) = parser 
@@ -47,40 +60,15 @@ let mapP f parser =
     Parser innerFn
 let (|>>) x f = mapP f x
 
-let rec parseZeroOrMore parser input =
-    let firstResult = run parser input
-    match firstResult with
-    | Failure err -> ([],input)
-    | Success (firstValue,inputAfterFirstParse) ->
-        let (subsequentValues,remainingInput) = parseZeroOrMore parser inputAfterFirstParse
-        let values = firstValue::subsequentValues
-        (values,remainingInput)
-
-let many parser =
-    let rec innerFn input = Success (parseZeroOrMore parser input)
-    Parser innerFn
     
-type Number = One | Five | Ten | Fifty
-
-let pnumber charToMatch number = 
-    let innerFun str = 
-        if String.IsNullOrEmpty(str) 
-        then Failure "No more input"
-        else
-            let first = str.[0]
-            if first = charToMatch 
-            then Success (number, str.[1..])
-            else Failure (sprintf "Expecting '%c'. Got '%c'" charToMatch first)
-    Parser innerFun 
-    
-let zeroOrOneParser parser =
+let zeroOrOneTime parser =
     let rec innerFun input = 
         match run parser input with
         | Failure _ -> Success ([], input)
         | Success (firstValue, inputAfterFirstParse) -> Success ([firstValue], inputAfterFirstParse) 
     Parser innerFun
 
-let zeroToThreeParser parser =
+let zeroToThreeTimes parser =
     let rec innerFun count input = 
         match run parser input with
         | Failure _ -> ([], input)
@@ -92,15 +80,16 @@ let zeroToThreeParser parser =
             (values, remainingInput) 
     Parser (fun input -> Success (innerFun 1 input))
 
+
 let parseOne = pnumber 'I' One
 let parseFive = pnumber 'V' Five
 let parseTen = pnumber 'X' Ten
 let parseFifty = pnumber 'L' Fifty
 
-let (<@>) left right = andThen left right |>> (fun (x, y) -> x@y)
+let (<@>) left right = left .>>. right |>> (fun (x, y) -> x@y)
 
 let parse value = 
-    let parser = zeroOrOneParser parseFifty <@> zeroToThreeParser parseTen <@> zeroOrOneParser parseFive <@> zeroToThreeParser parseOne
+    let parser = zeroOrOneTime parseFifty <@> zeroToThreeTimes parseTen <@> zeroOrOneTime parseFive <@> zeroToThreeTimes parseOne
     match run parser value with
     | Failure msg -> Failure msg
     | Success (numbers, "") ->
