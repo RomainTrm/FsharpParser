@@ -8,7 +8,7 @@ type Result<'a> =
     
 type Parser<'T> = Parser of (string -> Result<'T * string>)
 
-type Number = One | Five | Ten | Fifty
+type NumberUnit = One | Five | Ten | Fifty
 
 let pnumber charToMatch number = 
     let innerFun str = 
@@ -68,6 +68,13 @@ let zeroOrOneTime parser =
         | Success (firstValue, inputAfterFirstParse) -> Success ([firstValue], inputAfterFirstParse) 
     Parser innerFun
 
+let once parser =
+    let rec innerFun input = 
+        match run parser input with
+        | Failure msg -> Failure msg
+        | Success (firstValue, inputAfterFirstParse) -> Success ([firstValue], inputAfterFirstParse) 
+    Parser innerFun
+
 let zeroToThreeTimes parser =
     let rec innerFun count input = 
         match run parser input with
@@ -81,21 +88,31 @@ let zeroToThreeTimes parser =
     Parser (fun input -> Success (innerFun 1 input))
 
 
-let parseOne = pnumber 'I' One
-let parseFive = pnumber 'V' Five
-let parseTen = pnumber 'X' Ten
-let parseFifty = pnumber 'L' Fifty
+let one = pnumber 'I' One
+let five = pnumber 'V' Five
+let ten = pnumber 'X' Ten
+let fifty = pnumber 'L' Fifty
 
 let (<@>) left right = left .>>. right |>> (fun (x, y) -> x@y)
 
+let romanParser = (once one <@> once (five <|> ten)) <|> (zeroOrOneTime fifty <@> zeroToThreeTimes ten <@> zeroOrOneTime five <@> zeroToThreeTimes one)
+
+let numberValue = function
+    | One -> 1
+    | Five -> 5
+    | Ten -> 10
+    | Fifty -> 50
+
+let sumNumbers numbers = 
+        numbers 
+        |> List.map numberValue
+        |> List.pairwise
+        |> List.map (fun (left, right) -> if left < right then -left else left)
+        |> fun heads -> heads@[(numbers |> List.last |> numberValue)]
+        |> List.sum
+
 let parse value = 
-    let parser = zeroOrOneTime parseFifty <@> zeroToThreeTimes parseTen <@> zeroOrOneTime parseFive <@> zeroToThreeTimes parseOne
-    match run parser value with
+    match run romanParser value with
     | Failure msg -> Failure msg
-    | Success (numbers, "") ->
-        Success (numbers |> List.sumBy (fun nb -> match nb with
-                                                  | One -> 1
-                                                  | Five -> 5
-                                                  | Ten -> 10
-                                                  | Fifty -> 50))
+    | Success (numbers, "") -> Success (sumNumbers numbers)
     | Success (_, _) -> Failure "Not a valid input"

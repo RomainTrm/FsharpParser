@@ -14,12 +14,12 @@ let testCases = [|
         { Input = "I"; Result = Success 1 }
         { Input = "II"; Result = Success 2 }
         { Input = "III"; Result = Success 3 }
-        //{ Input = "IV"; Result = Success 4 }
+        { Input = "IV"; Result = Success 4 }
         { Input = "V"; Result = Success 5 }
         { Input = "VI"; Result = Success 6 }
         { Input = "VII"; Result = Success 7 }
         { Input = "VIII"; Result = Success 8 }    
-        //{ Input = "IX"; Result = Success 9 }
+        { Input = "IX"; Result = Success 9 }
         { Input = "X"; Result = Success 10 }
         { Input = "XI"; Result = Success 11 }
         { Input = "XII"; Result = Success 12 }
