@@ -95,7 +95,10 @@ let fifty = pnumber 'L' Fifty
 
 let (<@>) left right = left .>>. right |>> (fun (x, y) -> x@y)
 
-let romanParser = (once one <@> once (five <|> ten)) <|> (zeroOrOneTime fifty <@> zeroToThreeTimes ten <@> zeroOrOneTime five <@> zeroToThreeTimes one)
+let nine = once one <@> once ten
+let four = once one <@> once five
+
+let romanParser = zeroOrOneTime fifty <@> zeroToThreeTimes ten <@> (nine <|> four <|> (zeroOrOneTime five <@> zeroToThreeTimes one))
 
 let numberValue = function
     | One -> 1
