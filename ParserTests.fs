@@ -12,9 +12,12 @@ let ``Should parse roman number`` case =
     parse case.Input |> should equal case.Result
 
 let testCases = [|
+        { Input = ""; Result = Failure "No input" }
+        { Input = "  "; Result = Failure "No input" }
         { Input = "Invalid input"; Result = Failure "Not a valid input : some characters are remaining" }
         { Input = "IIII"; Result = Failure "Not a valid input : some characters are remaining" }
-        { Input = "VV"; Result = Failure "Not a valid input : some characters are remaining"  }
+        { Input = "VV"; Result = Failure "Not a valid input : some characters are remaining" }
+        { Input = "CC"; Result = Failure "Not a valid input : some characters are remaining" }
 
         { Input = "I"; Result = Success 1 }
         { Input = "II"; Result = Success 2 }

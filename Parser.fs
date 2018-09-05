@@ -5,7 +5,7 @@ open System
 type Result<'a> = 
     | Success of 'a
     | Failure of string
-    
+
 type Parser<'T> = Parser of (string -> Result<'T * string>)
 
 type NumberUnit = One | Five | Ten | Fifty | Hundred
@@ -13,7 +13,7 @@ type NumberUnit = One | Five | Ten | Fifty | Hundred
 let pnumber charToMatch number = 
     let innerFun str = 
         if String.IsNullOrEmpty(str) 
-        then Failure "No more input"
+        then Failure "No input"
         else
             let first = str.[0]
             if first = charToMatch 
@@ -28,10 +28,10 @@ let run parser input =
 let andThen parser1 parser2 =
     let innerFun input =
         match run parser1 input with
-        | Failure msg -> Failure msg
+        | Failure reason -> Failure reason
         | Success (value1, remaining1) -> 
             match run parser2 remaining1 with
-            | Failure msg -> Failure msg
+            | Failure reason -> Failure reason
             | Success (value2, remaining2) -> 
                 Success ((value1, value2), remaining2)
     Parser innerFun
@@ -71,7 +71,7 @@ let zeroOrOneTime parser =
 let once parser =
     let rec innerFun input = 
         match run parser input with
-        | Failure msg -> Failure msg
+        | Failure reason -> Failure reason
         | Success (firstValue, inputAfterFirstParse) -> Success ([firstValue], inputAfterFirstParse) 
     Parser innerFun
 
@@ -98,8 +98,10 @@ let (<@>) left right = left .>>. right |>> (fun (x, y) -> x@y)
 
 let nine = once one <@> once ten
 let four = once one <@> once five
+let fourty = once ten <@> once fifty
+let ninety = once ten <@> once hundred
 
-let romanParser = choice [once ten <@> once hundred; zeroOrOneTime hundred] <@> choice [once ten <@> once fifty; zeroOrOneTime fifty <@> zeroToThreeTimes ten] <@> choice [nine; four; zeroOrOneTime five <@> zeroToThreeTimes one]
+let romanParser = choice [ninety; zeroOrOneTime hundred] <@> choice [fourty; zeroOrOneTime fifty <@> zeroToThreeTimes ten] <@> choice [nine; four; zeroOrOneTime five <@> zeroToThreeTimes one]
 
 let numberValue = function
     | One -> 1
@@ -116,8 +118,11 @@ let sumNumbers numbers =
         |> fun values -> values@[(numbers |> List.last |> numberValue)]
         |> List.sum
 
-let parse value = 
-    match run romanParser value with
-    | Failure msg -> Failure msg
-    | Success (numbers, "") -> Success (sumNumbers numbers)
-    | Success (_, _) -> Failure "Not a valid input : some characters are remaining"
+let parse value =
+    if String.IsNullOrWhiteSpace(value) 
+    then Failure "No input"
+    else
+        match run romanParser value with
+        | Failure reason -> Failure reason
+        | Success (numbers, "") -> Success (sumNumbers numbers)
+        | Success (_, _) -> Failure  "Not a valid input : some characters are remaining"
