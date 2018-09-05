@@ -8,7 +8,7 @@ type Result<'a> =
     
 type Parser<'T> = Parser of (string -> Result<'T * string>)
 
-type NumberUnit = One | Five | Ten | Fifty
+type NumberUnit = One | Five | Ten | Fifty | Hundred
 
 let pnumber charToMatch number = 
     let innerFun str = 
@@ -92,30 +92,32 @@ let one = pnumber 'I' One
 let five = pnumber 'V' Five
 let ten = pnumber 'X' Ten
 let fifty = pnumber 'L' Fifty
+let hundred = pnumber 'C' Hundred
 
 let (<@>) left right = left .>>. right |>> (fun (x, y) -> x@y)
 
 let nine = once one <@> once ten
 let four = once one <@> once five
 
-let romanParser = zeroOrOneTime fifty <@> zeroToThreeTimes ten <@> (nine <|> four <|> (zeroOrOneTime five <@> zeroToThreeTimes one))
+let romanParser = choice [once ten <@> once hundred; zeroOrOneTime hundred] <@> choice [once ten <@> once fifty; zeroOrOneTime fifty <@> zeroToThreeTimes ten] <@> choice [nine; four; zeroOrOneTime five <@> zeroToThreeTimes one]
 
 let numberValue = function
     | One -> 1
     | Five -> 5
     | Ten -> 10
     | Fifty -> 50
+    | Hundred -> 100
 
 let sumNumbers numbers = 
         numbers 
         |> List.map numberValue
         |> List.pairwise
         |> List.map (fun (left, right) -> if left < right then -left else left)
-        |> fun heads -> heads@[(numbers |> List.last |> numberValue)]
+        |> fun values -> values@[(numbers |> List.last |> numberValue)]
         |> List.sum
 
 let parse value = 
     match run romanParser value with
     | Failure msg -> Failure msg
     | Success (numbers, "") -> Success (sumNumbers numbers)
-    | Success (_, _) -> Failure "Not a valid input"
+    | Success (_, _) -> Failure "Not a valid input : some characters are remaining"
